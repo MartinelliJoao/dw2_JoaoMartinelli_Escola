@@ -1,101 +1,118 @@
-/* Reset básico */
+/* ====== RESET BÁSICO ====== */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  font-family: "Roboto", "Inter", sans-serif;
 }
 
-/* Fontes e cores */
 body {
-  font-family: 'Inter', sans-serif;
-  background-color: #F1F5F9;
-  color: #0B1220;
+  background-color: #F1F5F9; /* fundo cinza claro */
+  color: #0B1220;           /* texto escuro */
+  padding: 20px;
 }
 
-/* Header */
+/* ====== HEADER ====== */
 header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 2rem;
-  background-color: #2563EB;
-  color: #FFFFFF;
-  position: sticky;
-  top: 0;
+  background: #2563EB; /* azul */
+  color: white;
+  padding: 15px;
+  text-align: center;
+  border-radius: 8px;
+  margin-bottom: 20px;
 }
 
-header input {
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
+/* ====== FORMULÁRIO ====== */
+form {
+  background: white;
+  padding: 15px;
+  margin-bottom: 20px;
+  border-radius: 10px;
+  box-shadow: 0px 2px 5px rgba(0,0,0,0.1);
+}
+
+form input,
+form select,
+form button {
+  padding: 8px;
+  margin: 5px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+
+form button {
+  background: #10B981; /* verde */
+  color: white;
   border: none;
-  outline: none;
-}
-
-/* Layout principal */
-.container {
-  display: flex;
-  gap: 1rem;
-  padding: 1rem 2rem;
-}
-
-.sidebar {
-  flex: 1;
-  background-color: #FFFFFF;
-  padding: 1rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.conteudo {
-  flex: 3;
-  background-color: #FFFFFF;
-  padding: 1rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-button {
   cursor: pointer;
-  padding: 0.5rem 1rem;
-  margin-bottom: 1rem;
-  background-color: #10B981;
-  color: #FFF;
+  transition: 0.3s;
+}
+
+form button:hover {
+  background: #059669; /* verde mais escuro */
+}
+
+/* ====== FILTROS ====== */
+label {
+  font-weight: bold;
+  margin-right: 10px;
+}
+
+#filtro-status {
+  padding: 6px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+/* ====== TABELA ====== */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0px 2px 5px rgba(0,0,0,0.1);
+}
+
+table th {
+  background: #2563EB; /* azul */
+  color: white;
+  padding: 10px;
+  text-align: left;
+}
+
+table td {
+  padding: 8px;
+  border-bottom: 1px solid #ddd;
+}
+
+table tr:nth-child(even) {
+  background: #F9FAFB; /* zebra */
+}
+
+/* ====== BOTÕES DE AÇÃO ====== */
+button {
+  padding: 6px 12px;
+  border-radius: 6px;
   border: none;
-  border-radius: 4px;
-  transition: background-color 0.2s;
+  cursor: pointer;
+  font-size: 14px;
 }
 
-button:hover {
-  background-color: #0f9f72;
+button[onclick^="editarAluno"] {
+  background: #F97316; /* laranja */
+  color: white;
 }
 
-/* Lista de alunos */
-#listaAlunos {
-  list-style: none;
+button[onclick^="editarAluno"]:hover {
+  background: #EA580C;
 }
 
-/* Modal */
-.modal {
-  display: none;
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  background: rgba(0,0,0,0.5);
-  justify-content: center;
-  align-items: center;
+button[onclick^="deletarAluno"] {
+  background: #EF4444; /* vermelho */
+  color: white;
 }
 
-.modal-conteudo {
-  background: #FFF;
-  padding: 2rem;
-  border-radius: 8px;
-  width: 300px;
-  position: relative;
-}
-
-.modal-conteudo .fechar {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background: #EF4444;
+button[onclick^="deletarAluno"]:hover {
+  background: #DC2626;
 }

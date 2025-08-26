@@ -22,4 +22,4 @@ class Aluno(Base):
     status = Column(String, nullable=False, default="inativo")  # ativo / inativo
     turma_id = Column(Integer, ForeignKey("turmas.id"), nullable=True)
 
-    turma = relationship("Turma", back_populates="alunos") .
+    turma = relationship("Turma", back_populates="alunos")
