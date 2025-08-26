@@ -2,67 +2,60 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gestão Escolar</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <!-- Header -->
   <header>
     <h1>Gestão Escolar</h1>
-    <input type="text" placeholder="Buscar aluno..." id="buscaAluno" aria-label="Buscar aluno">
   </header>
 
-  <!-- Main Layout -->
-  <main class="container">
-    <!-- Sidebar com filtros/estatísticas -->
-    <aside class="sidebar">
-      <h2>Filtros</h2>
-      <div>
-        <label for="filtroTurma">Turma:</label>
-        <select id="filtroTurma">
-          <option value="">Todas</option>
-        </select>
-      </div>
-      <div>
-        <label for="filtroStatus">Status:</label>
-        <select id="filtroStatus">
-          <option value="">Todos</option>
+  <main>
+    <section>
+      <h2>Cadastro / Edição de Aluno</h2>
+      <form id="form-aluno">
+        <input type="text" id="nome" placeholder="Nome" required minlength="3" maxlength="80">
+        <input type="date" id="data_nascimento" required>
+        <input type="email" id="email" placeholder="E-mail">
+
+        <select id="status" required>
           <option value="ativo">Ativo</option>
           <option value="inativo">Inativo</option>
         </select>
-      </div>
 
-      <h2>Estatísticas</h2>
-      <p id="totalAlunos">Total de alunos: 0</p>
-      <p id="totalAtivos">Ativos: 0</p>
-    </aside>
-
-    <!-- Área principal de conteúdo -->
-    <section class="conteudo">
-      <button id="abrirModal" aria-label="Adicionar novo aluno">Novo Aluno</button>
-      <ul id="listaAlunos"></ul>
-    </section>
-  </main>
-
-  <!-- Modal Novo Aluno -->
-  <div id="modalNovoAluno" class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloModal">
-    <div class="modal-conteudo">
-      <h2 id="tituloModal">Novo Aluno</h2>
-      <form id="formNovoAluno">
-        <input type="text" placeholder="Nome" required aria-label="Nome do aluno">
-        <input type="date" placeholder="Data de Nascimento" required aria-label="Data de nascimento">
-        <input type="email" placeholder="Email" aria-label="Email">
-        <select required aria-label="Status">
-          <option value="">Status</option>
-          <option value="ativo">Ativo</option>
-          <option value="inativo">Inativo</option>
+        <select id="turma-select">
+          <option value="">Sem turma</option>
         </select>
+
         <button type="submit">Salvar</button>
       </form>
-      <button class="fechar" aria-label="Fechar modal">X</button>
-    </div>
-  </div>
+    </section>
+
+    <section>
+      <h2>Lista de Alunos</h2>
+      <label>Status:</label>
+      <select id="filtro-status">
+        <option value="">Todos</option>
+        <option value="ativo">Ativo</option>
+        <option value="inativo">Inativo</option>
+      </select>
+
+      <table border="1" cellpadding="5">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Nome</th>
+            <th>Nascimento</th>
+            <th>Email</th>
+            <th>Status</th>
+            <th>Turma</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="alunos-tbody"></tbody>
+      </table>
+    </section>
+  </main>
 
   <script src="scripts.js"></script>
 </body>
