@@ -1,140 +1,205 @@
 const API_URL = "http://127.0.0.1:8000";
 
-// Elementos do DOM
-const alunosTable = document.getElementById("alunos-tbody");
-const formAluno = document.getElementById("form-aluno");
-const turmaSelect = document.getElementById("turma-select");
-const filtroStatus = document.getElementById("filtro-status");
+// ---------- ESTADO GLOBAL ----------
+let alunosCache = [];
+let turmasCache = [];
 
-// Variável de controle (edição)
-let editandoId = null;
+// ---------- UTILIDADES ----------
+function showAlert(message, type = "info") {
+  // type: info, success, error
+  const alerta = document.createElement("div");
+  alerta.textContent = message;
+  alerta.className = `alert ${type}`;
+  document.body.appendChild(alerta);
+  setTimeout(() => alerta.remove(), 3000);
+}
 
-// =========================
-// FUNÇÕES AUXILIARES
-// =========================
+function criarLinhaAluno(aluno) {
+  const row = document.createElement("tr");
+  row.innerHTML = `
+    <td>${aluno.id}</td>
+    <td>${aluno.nome}</td>
+    <td>${aluno.data_nascimento}</td>
+    <td>${aluno.email || "-"}</td>
+    <td>${aluno.status}</td>
+    <td>${aluno.turma_id || "-"}</td>
+    <td>
+      <button class="btn-edit" onclick="editarAluno(${aluno.id})">✏️</button>
+      <button class="btn-delete" onclick="deletarAluno(${aluno.id})">🗑️</button>
+    </td>
+  `;
+  return row;
+}
+
+// ---------- CARREGAR ALUNOS ----------
 async function carregarAlunos() {
-  alunosTable.innerHTML = "";
-  let response = await fetch(`${API_URL}/alunos`);
-  let alunos = await response.json();
-
-  // Aplicar filtros
-  let statusFiltro = filtroStatus.value;
-  let turmaFiltro = turmaSelect.value;
-
-  alunos = alunos.filter(a => {
-    if (statusFiltro && a.status !== statusFiltro) return false;
-    if (turmaFiltro && a.turma_id != turmaFiltro) return false;
-    return true;
-  });
-
-  alunos.forEach(aluno => {
-    let row = document.createElement("tr");
-    row.innerHTML = `
-      <td>${aluno.id}</td>
-      <td>${aluno.nome}</td>
-      <td>${aluno.data_nascimento}</td>
-      <td>${aluno.email ?? "-"}</td>
-      <td>${aluno.status}</td>
-      <td>${aluno.turma_id ?? "-"}</td>
-      <td>
-        <button onclick="editarAluno(${aluno.id})">✏️ Editar</button>
-        <button onclick="deletarAluno(${aluno.id})">🗑️ Excluir</button>
-      </td>
-    `;
-    alunosTable.appendChild(row);
-  });
+  try {
+    const res = await fetch(`${API_URL}/alunos`);
+    alunosCache = await res.json();
+    mostrarAlunos(alunosCache);
+  } catch (err) {
+    showAlert("Erro ao carregar alunos", "error");
+    console.error(err);
+  }
 }
 
+function mostrarAlunos(alunos) {
+  const tabela = document.getElementById("alunos-tabela");
+  tabela.innerHTML = "";
+  alunos.forEach(aluno => tabela.appendChild(criarLinhaAluno(aluno)));
+  atualizarContadores(alunos);
+}
+
+// ---------- CARREGAR TURMAS ----------
 async function carregarTurmas() {
-  turmaSelect.innerHTML = `<option value="">Sem turma</option>`;
-  let response = await fetch(`${API_URL}/turmas`);
-  let turmas = await response.json();
+  try {
+    const res = await fetch(`${API_URL}/turmas`);
+    turmasCache = await res.json();
 
-  turmas.forEach(t => {
-    let option = document.createElement("option");
-    option.value = t.id;
-    option.textContent = `${t.nome} (cap: ${t.capacidade})`;
-    turmaSelect.appendChild(option);
-  });
+    const select = document.getElementById("turma-select");
+    select.innerHTML = "<option value=''>-- Todas --</option>";
+    turmasCache.forEach(t => {
+      const opt = document.createElement("option");
+      opt.value = t.id;
+      opt.textContent = `${t.nome} (cap: ${t.capacidade})`;
+      select.appendChild(opt);
+    });
+  } catch (err) {
+    showAlert("Erro ao carregar turmas", "error");
+    console.error(err);
+  }
 }
 
-// =========================
-// EVENTOS
-// =========================
-formAluno.addEventListener("submit", async (e) => {
-  e.preventDefault();
+// ---------- ADICIONAR ALUNO ----------
+async function adicionarAluno() {
+  const nome = document.getElementById("nome").value.trim();
+  const data_nascimento = document.getElementById("data_nascimento").value;
+  const email = document.getElementById("email").value.trim();
 
-  const aluno = {
-    nome: document.getElementById("nome").value,
-    data_nascimento: document.getElementById("data_nascimento").value,
-    email: document.getElementById("email").value || null,
-    status: document.getElementById("status").value,
-    turma_id: turmaSelect.value || null
-  };
-
-  let url = `${API_URL}/alunos`;
-  let method = "POST";
-
-  if (editandoId) {
-    url = `${API_URL}/alunos/${editandoId}`;
-    method = "PUT";
+  if (!nome || !data_nascimento) {
+    showAlert("Nome e data de nascimento são obrigatórios!", "error");
+    return;
   }
 
-  let response = await fetch(url, {
-    method,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(aluno)
-  });
+  const aluno = { nome, data_nascimento, email, status: "inativo" };
 
-  if (response.ok) {
-    alert(editandoId ? "Aluno atualizado!" : "Aluno cadastrado!");
-    formAluno.reset();
-    editandoId = null;
-    carregarAlunos();
-  } else {
-    alert("Erro ao salvar aluno!");
+  try {
+    const res = await fetch(`${API_URL}/alunos`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(aluno),
+    });
+
+    if (res.ok) {
+      showAlert("Aluno cadastrado!", "success");
+      carregarAlunos();
+      document.getElementById("nome").value = "";
+      document.getElementById("data_nascimento").value = "";
+      document.getElementById("email").value = "";
+    } else {
+      showAlert("Erro ao cadastrar aluno", "error");
+    }
+  } catch (err) {
+    showAlert("Erro ao cadastrar aluno", "error");
+    console.error(err);
   }
-});
-
-filtroStatus.addEventListener("change", carregarAlunos);
-turmaSelect.addEventListener("change", carregarAlunos);
-
-// =========================
-// AÇÕES DE EDITAR/EXCLUIR
-// =========================
-async function editarAluno(id) {
-  let response = await fetch(`${API_URL}/alunos`);
-  let alunos = await response.json();
-  let aluno = alunos.find(a => a.id === id);
-
-  if (!aluno) return alert("Aluno não encontrado!");
-
-  document.getElementById("nome").value = aluno.nome;
-  document.getElementById("data_nascimento").value = aluno.data_nascimento;
-  document.getElementById("email").value = aluno.email ?? "";
-  document.getElementById("status").value = aluno.status;
-  turmaSelect.value = aluno.turma_id ?? "";
-
-  editandoId = aluno.id;
-  alert("Editando aluno ID " + aluno.id);
 }
 
+// ---------- DELETAR ALUNO ----------
 async function deletarAluno(id) {
-  if (!confirm("Deseja realmente excluir este aluno?")) return;
-
-  let response = await fetch(`${API_URL}/alunos/${id}`, { method: "DELETE" });
-  if (response.ok) {
-    alert("Aluno excluído!");
-    carregarAlunos();
-  } else {
-    alert("Erro ao excluir!");
+  if (!confirm("Tem certeza que deseja excluir este aluno?")) return;
+  try {
+    const res = await fetch(`${API_URL}/alunos/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      showAlert("Aluno excluído!", "success");
+      carregarAlunos();
+    } else {
+      showAlert("Erro ao excluir aluno", "error");
+    }
+  } catch (err) {
+    showAlert("Erro ao excluir aluno", "error");
+    console.error(err);
   }
 }
 
-// =========================
-// INICIALIZAÇÃO
-// =========================
-window.onload = async () => {
-  await carregarTurmas();
-  await carregarAlunos();
+// ---------- EDITAR ALUNO ----------
+async function editarAluno(id) {
+  const aluno = alunosCache.find(a => a.id === id);
+  if (!aluno) return;
+
+  const novoNome = prompt("Editar nome:", aluno.nome);
+  if (!novoNome) return;
+
+  try {
+    const res = await fetch(`${API_URL}/alunos/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...aluno, nome: novoNome }),
+    });
+
+    if (res.ok) {
+      showAlert("Aluno atualizado!", "success");
+      carregarAlunos();
+    } else {
+      showAlert("Erro ao atualizar aluno", "error");
+    }
+  } catch (err) {
+    showAlert("Erro ao atualizar aluno", "error");
+    console.error(err);
+  }
+}
+
+// ---------- FILTRO ----------
+function filtrarAlunos() {
+  const turmaId = document.getElementById("turma-select").value;
+  const status = document.getElementById("status-select").value;
+
+  let filtrados = [...alunosCache];
+  if (turmaId) filtrados = filtrados.filter(a => String(a.turma_id) === turmaId);
+  if (status) filtrados = filtrados.filter(a => a.status === status);
+
+  mostrarAlunos(filtrados);
+}
+
+// ---------- EXPORTAR ----------
+function exportarCSV() {
+  const linhas = ["ID,Nome,Data Nasc.,Email,Status,Turma"];
+  alunosCache.forEach(a => {
+    linhas.push([a.id, a.nome, a.data_nascimento, a.email || "-", a.status, a.turma_id || "-"].join(","));
+  });
+
+  const blob = new Blob([linhas.join("\n")], { type: "text/csv" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "alunos.csv";
+  link.click();
+}
+
+function exportarJSON() {
+  const blob = new Blob([JSON.stringify(alunosCache, null, 2)], { type: "application/json" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "alunos.json";
+  link.click();
+}
+
+// ---------- CONTADORES ----------
+function atualizarContadores(alunos) {
+  const total = alunos.length;
+  const ativos = alunos.filter(a => a.status === "ativo").length;
+
+  const porTurma = turmasCache.map(t => {
+    const count = alunos.filter(a => String(a.turma_id) === String(t.id)).length;
+    return `${t.nome}: ${count}`;
+  }).join(" | ");
+
+  document.getElementById("contador-total").textContent = total;
+  document.getElementById("contador-ativos").textContent = ativos;
+  document.getElementById("contador-por-turma").textContent = porTurma;
+}
+
+// ---------- INICIAR ----------
+window.onload = () => {
+  carregarAlunos();
+  carregarTurmas();
 };
