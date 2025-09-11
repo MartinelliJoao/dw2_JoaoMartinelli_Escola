@@ -1,76 +1,17 @@
 const API_URL = "http://127.0.0.1:8000";
 
-// ---------- ESTADO GLOBAL ----------
-let alunosCache = [];
-let turmasCache = [];
+let turmaMap = {}; // id -> nome
 
-// ---------- UTILIDADES ----------
-function showAlert(message, type = "info") {
-  // type: info, success, error
-  const alerta = document.createElement("div");
-  alerta.textContent = message;
-  alerta.className = `alert ${type}`;
-  document.body.appendChild(alerta);
-  setTimeout(() => alerta.remove(), 3000);
+function formatDateISOToBR(iso) {
+  if (!iso) return "-";
+  // espera yyyy-mm-dd ou yyyy-mm-ddTHH:MM:SS
+  const d = iso.split("T")[0];
+  const parts = d.split("-");
+  if (parts.length !== 3) return iso;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
-function criarLinhaAluno(aluno) {
-  const row = document.createElement("tr");
-  row.innerHTML = `
-    <td>${aluno.id}</td>
-    <td>${aluno.nome}</td>
-    <td>${aluno.data_nascimento}</td>
-    <td>${aluno.email || "-"}</td>
-    <td>${aluno.status}</td>
-    <td>${aluno.turma_id || "-"}</td>
-    <td>
-      <button class="btn-edit" onclick="editarAluno(${aluno.id})">✏️</button>
-      <button class="btn-delete" onclick="deletarAluno(${aluno.id})">🗑️</button>
-    </td>
-  `;
-  return row;
-}
-
-// ---------- CARREGAR ALUNOS ----------
-async function carregarAlunos() {
-  try {
-    const res = await fetch(`${API_URL}/alunos`);
-    alunosCache = await res.json();
-    mostrarAlunos(alunosCache);
-  } catch (err) {
-    showAlert("Erro ao carregar alunos", "error");
-    console.error(err);
-  }
-}
-
-function mostrarAlunos(alunos) {
-  const tabela = document.getElementById("alunos-tabela");
-  tabela.innerHTML = "";
-  alunos.forEach(aluno => tabela.appendChild(criarLinhaAluno(aluno)));
-  atualizarContadores(alunos);
-}
-
-// ---------- CARREGAR TURMAS ----------
-async function carregarTurmas() {
-  try {
-    const res = await fetch(`${API_URL}/turmas`);
-    turmasCache = await res.json();
-
-    const select = document.getElementById("turma-select");
-    select.innerHTML = "<option value=''>-- Todas --</option>";
-    turmasCache.forEach(t => {
-      const opt = document.createElement("option");
-      opt.value = t.id;
-      opt.textContent = `${t.nome} (cap: ${t.capacidade})`;
-      select.appendChild(opt);
-    });
-  } catch (err) {
-    showAlert("Erro ao carregar turmas", "error");
-    console.error(err);
-  }
-}
-
-// ---------- ADICIONAR ALUNO ----------
+// Função chamada pelo botão no HTML
 async function adicionarAluno() {
   const nome = document.getElementById("nome").value.trim();
   const data = document.getElementById("data_nascimento").value;
@@ -83,120 +24,135 @@ async function adicionarAluno() {
     return;
   }
 
-  const aluno = { nome, data_nascimento, email, status: "inativo" };
+  const aluno = {
+    nome: nome,
+    data_nascimento: data, // yyyy-mm-dd
+    email: email || null,
+    status: status || "inativo",
+    turma_id: turmaVal ? parseInt(turmaVal, 10) : null
+  };
 
   try {
-    const res = await fetch(`${API_URL}/alunos`, {
+    const response = await fetch(`${API_URL}/alunos`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(aluno),
+      body: JSON.stringify(aluno)
     });
 
-    if (res.ok) {
-      showAlert("Aluno cadastrado!", "success");
-      carregarAlunos();
-      document.getElementById("nome").value = "";
-      document.getElementById("data_nascimento").value = "";
-      document.getElementById("email").value = "";
-    } else {
-      showAlert("Erro ao cadastrar aluno", "error");
+    if (!response.ok) {
+      let errText = response.statusText;
+      try {
+        const errJson = await response.json();
+        errText = errJson.detail || JSON.stringify(errJson);
+      } catch (e) {}
+      console.error("Erro ao cadastrar aluno:", errText);
+      alert(`Erro ao cadastrar: ${errText}`);
+      return;
     }
 
-// ---------- DELETAR ALUNO ----------
-async function deletarAluno(id) {
-  if (!confirm("Tem certeza que deseja excluir este aluno?")) return;
-  try {
-    const res = await fetch(`${API_URL}/alunos/${id}`, { method: "DELETE" });
-    if (res.ok) {
-      showAlert("Aluno excluído!", "success");
-      carregarAlunos();
-    } else {
-      showAlert("Erro ao excluir aluno", "error");
-    }
-  } catch (err) {
-    showAlert("Erro ao excluir aluno", "error");
-    console.error(err);
+    const dataResp = await response.json();
+    console.log("Aluno cadastrado:", dataResp);
+    // limpar campos básicos
+    document.getElementById("nome").value = "";
+    document.getElementById("data_nascimento").value = "";
+    document.getElementById("email").value = "";
+    document.getElementById("status-aluno").value = "inativo";
+    document.getElementById("turma-select").value = "";
+
+    // atualizar lista imediatamente
+    listarAlunos();
+  } catch (error) {
+    console.error("Erro inesperado:", error);
+    alert("Erro de conexão com o servidor.");
   }
 }
 
-// ---------- EDITAR ALUNO ----------
-async function editarAluno(id) {
-  const aluno = alunosCache.find(a => a.id === id);
-  if (!aluno) return;
+// Mantém compatibilidade caso existam chamadas para cadastrarAluno
+const cadastrarAluno = adicionarAluno;
 
-  const novoNome = prompt("Editar nome:", aluno.nome);
-  if (!novoNome) return;
-
+async function carregarTurmas() {
   try {
-    const res = await fetch(`${API_URL}/alunos/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...aluno, nome: novoNome }),
+    const res = await fetch(`${API_URL}/turmas`);
+    if (!res.ok) return;
+    const turmas = await res.json();
+    const select = document.getElementById("turma-select");
+    // remove todas opções, manter a primeira (Sem turma) se houver
+    select.innerHTML = "<option value=''>Sem turma</option>";
+    turmaMap = {};
+    turmas.forEach(t => {
+      turmaMap[t.id] = t.nome;
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = t.nome;
+      select.appendChild(opt);
     });
-
-    if (res.ok) {
-      showAlert("Aluno atualizado!", "success");
-      carregarAlunos();
-    } else {
-      showAlert("Erro ao atualizar aluno", "error");
-    }
   } catch (err) {
-    showAlert("Erro ao atualizar aluno", "error");
-    console.error(err);
+    console.error('Erro ao carregar turmas', err);
   }
 }
 
-// ---------- FILTRO ----------
+async function listarAlunos(statusFilter = '') {
+  try {
+    let url = `${API_URL}/alunos`;
+    if (statusFilter) {
+      url += `?status=${encodeURIComponent(statusFilter)}`;
+    }
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error('Erro ao buscar alunos', response.statusText);
+      return;
+    }
+    const alunos = await response.json();
+
+    const tbody = document.getElementById('alunos-tabela');
+    tbody.innerHTML = '';
+
+    let ativos = 0;
+    const porTurma = {};
+
+    alunos.forEach(a => {
+      const tr = document.createElement('tr');
+
+      const tdId = document.createElement('td'); tdId.textContent = a.id; tr.appendChild(tdId);
+      const tdNome = document.createElement('td'); tdNome.textContent = a.nome; tr.appendChild(tdNome);
+      const tdData = document.createElement('td'); tdData.textContent = formatDateISOToBR(a.data_nascimento); tr.appendChild(tdData);
+      const tdEmail = document.createElement('td'); tdEmail.textContent = a.email || '-'; tr.appendChild(tdEmail);
+      const tdStatus = document.createElement('td'); tdStatus.textContent = a.status || '-';
+      tdStatus.className = a.status === 'ativo' ? 'status-ativo' : 'status-inativo'; tr.appendChild(tdStatus);
+      const tdTurma = document.createElement('td');
+      const turmaNome = a.turma_id ? (turmaMap[a.turma_id] || (`ID ${a.turma_id}`)) : '-';
+      tdTurma.textContent = turmaNome; tr.appendChild(tdTurma);
+      const tdAcoes = document.createElement('td'); tdAcoes.innerHTML = '<button disabled>Editar</button> <button disabled>Excluir</button>'; tr.appendChild(tdAcoes);
+
+      tbody.appendChild(tr);
+
+      if (a.status === 'ativo') ativos += 1;
+      const key = turmaNome || 'Sem turma';
+      porTurma[key] = (porTurma[key] || 0) + 1;
+    });
+
+    document.getElementById('contador-total').textContent = alunos.length;
+    document.getElementById('contador-ativos').textContent = ativos;
+    // montar string resumida para por turma
+    const porTurmaParts = Object.keys(porTurma).map(k => `${k}: ${porTurma[k]}`);
+    document.getElementById('contador-por-turma').textContent = porTurmaParts.length ? porTurmaParts.join(', ') : '-';
+
+  } catch (error) {
+    console.error("Erro ao buscar alunos:", error);
+  }
+}
+
 function filtrarAlunos() {
-  const turmaId = document.getElementById("turma-select").value;
-  const status = document.getElementById("status-select").value;
-
-  let filtrados = [...alunosCache];
-  if (turmaId) filtrados = filtrados.filter(a => String(a.turma_id) === turmaId);
-  if (status) filtrados = filtrados.filter(a => a.status === status);
-
-  mostrarAlunos(filtrados);
+  const status = document.getElementById('status-select').value;
+  listarAlunos(status);
 }
 
-// ---------- EXPORTAR ----------
-function exportarCSV() {
-  const linhas = ["ID,Nome,Data Nasc.,Email,Status,Turma"];
-  alunosCache.forEach(a => {
-    linhas.push([a.id, a.nome, a.data_nascimento, a.email || "-", a.status, a.turma_id || "-"].join(","));
-  });
+// Inicialização ao carregar a página
+document.addEventListener('DOMContentLoaded', () => {
+  // expõe funções para o HTML inline (onclick/onchange)
+  window.adicionarAluno = adicionarAluno;
+  window.filtrarAlunos = filtrarAlunos;
 
-  const blob = new Blob([linhas.join("\n")], { type: "text/csv" });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = "alunos.csv";
-  link.click();
-}
-
-function exportarJSON() {
-  const blob = new Blob([JSON.stringify(alunosCache, null, 2)], { type: "application/json" });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = "alunos.json";
-  link.click();
-}
-
-// ---------- CONTADORES ----------
-function atualizarContadores(alunos) {
-  const total = alunos.length;
-  const ativos = alunos.filter(a => a.status === "ativo").length;
-
-  const porTurma = turmasCache.map(t => {
-    const count = alunos.filter(a => String(a.turma_id) === String(t.id)).length;
-    return `${t.nome}: ${count}`;
-  }).join(" | ");
-
-  document.getElementById("contador-total").textContent = total;
-  document.getElementById("contador-ativos").textContent = ativos;
-  document.getElementById("contador-por-turma").textContent = porTurma;
-}
-
-// ---------- INICIAR ----------
-window.onload = () => {
-  carregarAlunos();
   carregarTurmas();
-};
+  listarAlunos();
+});
