@@ -91,6 +91,37 @@ async function carregarTurmas() {
   }
 }
 
+async function criarTurma() {
+  const nome = document.getElementById('turma-nome').value.trim();
+  const capacidade = parseInt(document.getElementById('turma-capacidade').value, 10) || 0;
+  if (!nome || capacidade <= 0) {
+    alert('Informe nome e capacidade válidos para a turma.');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_URL}/turmas`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nome: nome, capacidade: capacidade })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(`Erro ao criar turma: ${err.detail || res.statusText}`);
+      return;
+    }
+    const nova = await res.json();
+    // limpa campos e recarrega select
+    document.getElementById('turma-nome').value = '';
+    document.getElementById('turma-capacidade').value = '';
+    await carregarTurmas();
+    alert(`Turma ${nova.nome} criada.`);
+  } catch (e) {
+    console.error('Erro ao criar turma', e);
+    alert('Erro de conexão ao criar turma.');
+  }
+}
+
 async function listarAlunos(statusFilter = '') {
   try {
     let url = `${API_URL}/alunos`;
@@ -126,9 +157,17 @@ async function listarAlunos(statusFilter = '') {
 
       tbody.appendChild(tr);
 
-      if (a.status === 'ativo') ativos += 1;
-      const key = turmaNome || 'Sem turma';
-      porTurma[key] = (porTurma[key] || 0) + 1;
+    if (a.status === 'ativo') ativos += 1;
+    const key = turmaNome || 'Sem turma';
+    porTurma[key] = (porTurma[key] || 0) + 1;
+    // ações: editar / excluir
+    tdAcoes.innerHTML = '';
+    const btnEdit = document.createElement('button'); btnEdit.className = 'btn btn-sm btn-outline-primary me-1'; btnEdit.textContent = 'Editar';
+    btnEdit.onclick = () => abrirEdicao(a);
+    const btnDel = document.createElement('button'); btnDel.className = 'btn btn-sm btn-outline-danger'; btnDel.textContent = 'Excluir';
+    btnDel.onclick = () => excluirAluno(a.id);
+    tdAcoes.appendChild(btnEdit);
+    tdAcoes.appendChild(btnDel);
     });
 
     document.getElementById('contador-total').textContent = alunos.length;
@@ -140,6 +179,73 @@ async function listarAlunos(statusFilter = '') {
   } catch (error) {
     console.error("Erro ao buscar alunos:", error);
   }
+}
+
+// helper: mostrar alert bootstrap
+function showAlert(message, type='success', timeout=3000) {
+  const id = 'alert-' + Date.now();
+  const holder = document.getElementById('alert-placeholder');
+  const div = document.createElement('div');
+  div.id = id;
+  div.className = `alert alert-${type} alert-dismissible fade show`;
+  div.role = 'alert';
+  div.innerHTML = `${message} <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>`;
+  holder.appendChild(div);
+  setTimeout(()=>{try{div.classList.remove('show');div.classList.add('hide');div.remove();}catch(e){}}, timeout);
+}
+
+// abrir modal de edição
+function abrirEdicao(aluno) {
+  // preencher modal
+  document.getElementById('edit-id').value = aluno.id;
+  document.getElementById('edit-nome').value = aluno.nome;
+  document.getElementById('edit-data').value = aluno.data_nascimento ? aluno.data_nascimento.split('T')[0] : '';
+  document.getElementById('edit-email').value = aluno.email || '';
+  document.getElementById('edit-status').value = aluno.status || 'inativo';
+  // popular select de turmas
+  const editTurma = document.getElementById('edit-turma');
+  editTurma.innerHTML = '<option value="">Sem turma</option>';
+  Object.keys(turmaMap).forEach(id=>{
+    const opt = document.createElement('option'); opt.value = id; opt.textContent = turmaMap[id]; editTurma.appendChild(opt);
+  });
+  document.getElementById('edit-turma').value = aluno.turma_id || '';
+
+  // show modal
+  const modalEl = document.getElementById('editModal');
+  const modal = new bootstrap.Modal(modalEl);
+  modal.show();
+
+  // attach save handler
+  const saveBtn = document.getElementById('save-edit-btn');
+  saveBtn.onclick = async () => {
+    const id = document.getElementById('edit-id').value;
+    const nome = document.getElementById('edit-nome').value.trim();
+    const data = document.getElementById('edit-data').value;
+    const email = document.getElementById('edit-email').value.trim() || null;
+    const status = document.getElementById('edit-status').value;
+    const turma_id = document.getElementById('edit-turma').value ? parseInt(document.getElementById('edit-turma').value,10) : null;
+
+    try {
+      const res = await fetch(`${API_URL}/alunos/${id}`,{
+        method: 'PUT', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({nome:nome, data_nascimento:data, email:email, status:status, turma_id:turma_id})
+      });
+      if (!res.ok) { const e = await res.json().catch(()=>({})); showAlert(`Erro: ${e.detail||res.statusText}`,'danger'); return; }
+      showAlert('Aluno atualizado','success');
+      modal.hide();
+      listarAlunos();
+    } catch(err) { console.error(err); showAlert('Erro de conexão','danger'); }
+  };
+}
+
+async function excluirAluno(id) {
+  if (!confirm('Confirma exclusão do aluno?')) return;
+  try {
+    const res = await fetch(`${API_URL}/alunos/${id}`,{ method: 'DELETE' });
+    if (!res.ok) { const e = await res.json().catch(()=>({})); showAlert(`Erro: ${e.detail||res.statusText}`,'danger'); return; }
+    showAlert('Aluno excluído','success');
+    listarAlunos();
+  } catch(e) { console.error(e); showAlert('Erro de conexão','danger'); }
 }
 
 function filtrarAlunos() {
