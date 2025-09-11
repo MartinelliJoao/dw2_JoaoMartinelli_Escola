@@ -1,16 +1,24 @@
 from fastapi import FastAPI, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from database import engine, Base, get_db
 from models import Aluno, Turma
-from datetime import date
+from datetime import datetime, date
 from typing import List, Optional
-
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, validator
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Gestão Escolar")
 
+# Allow CORS for local development (adjust origins for production)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # durante dev aceita todas; em produção restrinja
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ---------- SCHEMAS ----------
 class AlunoBase(BaseModel):
@@ -20,6 +28,16 @@ class AlunoBase(BaseModel):
     status: str = "inativo"
     turma_id: Optional[int] = None
 
+    # 🔧 Corrigindo erro de data (aceita string vinda do input)
+    @validator("data_nascimento", pre=True)
+    def parse_data(cls, v):
+        if isinstance(v, str):
+            try:
+                return datetime.strptime(v, "%Y-%m-%d").date()
+            except ValueError:
+                raise ValueError("Data inválida, use o formato AAAA-MM-DD")
+        return v
+
 
 class AlunoCreate(AlunoBase):
     pass
@@ -27,7 +45,6 @@ class AlunoCreate(AlunoBase):
 
 class AlunoResponse(AlunoBase):
     id: int
-
     class Config:
         orm_mode = True
 
@@ -44,19 +61,16 @@ class TurmaCreate(TurmaBase):
 class TurmaResponse(TurmaBase):
     id: int
     alunos: List[AlunoResponse] = []
-
     class Config:
         orm_mode = True
 
 
 # ---------- ENDPOINTS ----------
 @app.get("/alunos", response_model=List[AlunoResponse])
-def listar_alunos(
-    search: Optional[str] = None,
-    turma_id: Optional[int] = None,
-    status: Optional[str] = None,
-    db: Session = Depends(get_db)
-):
+def listar_alunos(search: Optional[str] = None,
+                  turma_id: Optional[int] = None,
+                  status: Optional[str] = None,
+                  db: Session = Depends(get_db)):
     query = db.query(Aluno)
     if search:
         query = query.filter(Aluno.nome.ilike(f"%{search}%"))
@@ -69,11 +83,15 @@ def listar_alunos(
 
 @app.post("/alunos", response_model=AlunoResponse)
 def criar_aluno(aluno: AlunoCreate, db: Session = Depends(get_db)):
-    novo = Aluno(**aluno.dict())
-    db.add(novo)
-    db.commit()
-    db.refresh(novo)
-    return novo
+    try:
+        novo = Aluno(**aluno.dict())
+        db.add(novo)
+        db.commit()
+        db.refresh(novo)
+        return novo
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Erro ao cadastrar aluno: {str(e)}")
 
 
 @app.put("/alunos/{id}", response_model=AlunoResponse)

@@ -73,11 +73,13 @@ async function carregarTurmas() {
 // ---------- ADICIONAR ALUNO ----------
 async function adicionarAluno() {
   const nome = document.getElementById("nome").value.trim();
-  const data_nascimento = document.getElementById("data_nascimento").value;
+  const data = document.getElementById("data_nascimento").value;
   const email = document.getElementById("email").value.trim();
+  const status = document.getElementById("status-aluno").value;
+  const turmaVal = document.getElementById("turma-select").value;
 
-  if (!nome || !data_nascimento) {
-    showAlert("Nome e data de nascimento são obrigatórios!", "error");
+  if (!nome || !data) {
+    alert("Preencha nome e data de nascimento!");
     return;
   }
 
@@ -99,11 +101,6 @@ async function adicionarAluno() {
     } else {
       showAlert("Erro ao cadastrar aluno", "error");
     }
-  } catch (err) {
-    showAlert("Erro ao cadastrar aluno", "error");
-    console.error(err);
-  }
-}
 
 // ---------- DELETAR ALUNO ----------
 async function deletarAluno(id) {
