@@ -1,8 +1,9 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from database import engine, Base, get_db
-from models import Aluno, Turma
+# Use package-relative imports so the app can be started from the project root
+from .database import engine, Base, get_db
+from .models import Aluno, Turma
 from datetime import datetime, date
 from typing import List, Optional
 from pydantic import BaseModel, EmailStr, validator
